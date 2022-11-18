@@ -1,36 +1,62 @@
-import numpy as np
-from abc import ABC, abstractmethod
+import numpy
+
+betaParameter = 1
+maxVal = 99.3834
+minVal = 0.1558
+
+def simpleActivationFunc(value):
+    return 1 if value >= 0 else -1
+
+def linearActivationFunc(value):
+    return value
+
+def sigmoidTanhActivationFunc(value):
+    return numpy.tanh(value * betaParameter)
+
+def sigmoidTanhActivationFuncDerivative(value):
+    return betaParameter * (1 - value * value)
+
+def sigmoidLogisticActivationFunc(value):
+    return 1 / (1 + numpy.exp(-2*betaParameter*value))
+
+def simpleErrorFunc(trainingData, expectedOutput, w, activationFunc):
+    limit = len(trainingData)
+    error = 0
+    for i in range(limit):
+        actualOut = numpy.dot(trainingData[i], w)
+        error += ((expectedOutput[i] - activationFunc(actualOut)) ** 2)
+    return error / 2
+
+def denormalizeErrorFunc(trainingData, expectedOutput, w, activationFunc):
+    limit = len(trainingData)
 
 
-class Activation(ABC):
-    @staticmethod
-    @abstractmethod
-    def apply(self, x):
-        pass
+    error = 0
+    for i in range(limit):
+        aux = activationFunc(numpy.dot(trainingData[i], w))
+        actualOut = ((aux + 1)*(maxVal-minVal)/2)+minVal
+        expected = ((expectedOutput[i]+1)*(maxVal-minVal)/2)+minVal
+        error += ((expected - actualOut) ** 2)
+    return error / 2
 
-    @staticmethod
-    @abstractmethod
-    def apply_dx(self, x):
-        pass
+def normalize(output):
+    outData = numpy.zeros(len(output))
+
+    for i in range(len(output)):
+        current = (2*(output[i] - minVal)/(maxVal - minVal))-1
+        outData[i] = current
+
+    return outData
+
+def calcAccuracy(data, output, w, activationFunc):
+    count = 0
+    delta = 0.25
+    for i in range(len(data)):
+        aux = activationFunc(numpy.dot(data[i], w))
+        current = ((aux + 1)*(maxVal-minVal)/2)+minVal
+        #  print(f'current = {current}, output = {output[i]}')
+        if abs(output[i] - current) < delta:
+            count += 1
 
 
-class Sigmoid(Activation):
-
-    def apply(self, x):
-        if -700 < x < 700:
-            return np.exp(x) / (1 + np.exp(x))
-        return 0 if x < 0 else 1
-
-    def apply_dx(self, x):
-        # se hace 0 despues de este valor
-        if -355 < x < 355:
-            return np.exp(x) / np.power(np.exp(x) + 1, 2)
-        return 0
-
-
-class Tanh(Activation):
-    def apply(self, excitation):
-        return np.tanh(excitation)
-
-    def apply_dx(self, excitation):
-        return 1 - np.tanh(excitation) ** 2
+    return count/len(data)

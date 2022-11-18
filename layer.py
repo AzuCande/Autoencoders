@@ -1,33 +1,28 @@
-from Ejer3.neuron import Neuron
 import numpy as np
 
+
 class Layer:
+    def __init__(self, inputCount, inputSize):
+        self.input = inputSize
+        self.output = inputCount
+        self.weights = 2 * np.random.random((inputSize, inputCount)) - 1
+        self.bias = 2 * np.random.random(inputCount) - 1
+        self.derivativeError = None
 
-    def __init__(self, num_neurons, prev_num_neurons, activation, learn_rate):
-        self.neurons = np.array(list(Neuron(prev_num_neurons, activation, learn_rate) for i in range(num_neurons)))
-        # self.neurons = [Neuron(prev_num_neurons, activation, learn_rate) for i in range(num_neurons)]
+    def getWeights(self):
+        return np.array(self.weights)
 
-    # def get_size(self):
-    #     return self.size
+    def error(self, inherited_error, derivative, activation):
+        self.derivativeError = inherited_error * derivative(activation)
 
-    def get_all_outputs(self):
-        outputs = []
-        for current_neuron in self.neurons:
-            outputs.append(current_neuron.output)
-        return outputs
+    def delta(self, lastActivation, learnRate):
+        activationMatrix = np.matrix(lastActivation)
+        errorMatrix = np.matrix(self.derivativeError)
+        self.weights += learnRate * activationMatrix.T.dot(errorMatrix)
+        self.bias += learnRate * self.derivativeError
 
-    def get_neuron_delta(self, num_neuron):
-        delta = 0
-        for current_neuron in self.neurons:
-            delta += (current_neuron.weights[num_neuron] * current_neuron.delta)
-        return delta
+    def activate(self, feed, learn_f):
+        return learn_f(np.dot(feed, self.weights) + self.bias)
 
-    def propagation(self, inputs):
-        for neuron in self.neurons:
-            neuron.calculate_output(inputs)
-
-    def plot(self):
-        print("Layer " + " : ")
-        for neuron in self.neurons:
-            neuron.plot()
-        print("------------------------")
+    def __str__(self):
+        return str(self.weights)
