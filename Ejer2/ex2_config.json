@@ -1,7 +1,0 @@
-{
-    "perceptron": "non_linear",
-    "learning_rate": 0.01,
-    "beta": 0.8,
-    "generation": 500,
-    "test": false
-}

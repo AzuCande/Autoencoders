@@ -1,2 +1,0 @@
-XOR = "xor"
-AND = "and"
