@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from font import *
+import random
 
-def printLetter(letter):
+def print_letter(letter):
     arr = np.array(letter)
     test = np.array_split(letter, 5)
     aux = len(test)
@@ -16,9 +18,53 @@ def printLetter(letter):
 
 def graph_digits(original, output):
     fig, (ax1, ax2) = plt.subplots(1, 2)
-    for i in range(len(output)):
-        ax1.set_title('Original')
-        ax2.set_title('AE result')
-        ax1.imshow(np.array(original[i-1]).reshape((7, 5)), cmap='gray')
-        ax2.imshow(np.array(output[i-1]).reshape((7, 5)), cmap='gray')
-        fig.show()
+    ax1.set_title('Original')
+    ax2.set_title('AE result')
+    ax1.imshow(np.array(original).reshape((7, 5)), cmap='gray')
+    ax2.imshow(np.array(output).reshape((7, 5)), cmap='gray')
+    fig.show()
+
+def transform(t):
+    to_ret = []
+    for i in t:
+        aux = []
+        for num in i:
+            a = format(num, "b").zfill(5)
+            for j in a:
+                if j == "0":
+                    aux.append(-1)
+                elif j == "1":
+                    aux.append(1)
+        to_ret.append(aux)
+    return np.array(to_ret)
+
+def get_input(font):
+    return fonts
+
+def get_header(font):
+    return fonts_header
+
+def get_output(font):
+    return fonts_output
+
+def noise(t):
+    RAND = 1 / 35
+    to_ret = []
+    for i in t:
+        aux = []
+        for num in i:
+            a = format(num, "b").zfill(5)
+            for j in a:
+                rand = random.uniform(0, 1)
+                if j == "0":
+                    if rand < RAND:
+                        aux.append(1)
+                    else:
+                        aux.append(-1)
+                elif j == "1":
+                    if rand < RAND:
+                        aux.append(-1)
+                    else:
+                        aux.append(1)
+        to_ret.append(aux)
+    return np.array(to_ret)
