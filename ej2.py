@@ -5,14 +5,11 @@ from plot import *
 
 (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
 trainset = np.concatenate([x_train, x_test], axis=0)
-mnist_digits = np.expand_dims(trainset, -1).astype("float32") / 255
-
+trainset = np.expand_dims(trainset, -1).astype("float32") / 255
 vae = VariationalAutoencoder()
-vae.compile(optimizer=keras.optimizers.Adam())
-vae.fit(mnist_digits, epochs=1, batch_size=128)
-
-plot_latent_space(vae)
-
-x_train = np.expand_dims(x_train, -1).astype("float32") / 255
-
-plot_label_clusters(vae, x_train, y_train)
+vae.train(trainset)
+plotLatent(vae)
+trainset = np.expand_dims(x_train, -1).astype("float32") / 255
+trainoutputset = np.concatenate([y_train, y_test]).astype("float32") / 255
+trainoutputset = np.expand_dims(trainoutputset, -1).astype("float32") / 255
+plotAverages(vae, trainset, y_train)
