@@ -72,6 +72,33 @@ def noise(t):
         to_ret.append(aux)
     return np.array(to_ret)
 
+def makeLittleNoise(num, t):
+    to_ret = []
+    for i in t:
+        bits= []
+        for n in range(num): 
+            x = round(random.uniform(0, 6))
+            y = round(random.uniform(0, 4))
+            bits.append([x,y])
+        aux = []
+        for num in range(len(i)):
+            a = format(i[num], "b").zfill(5)
+            for j in range(len(a)):
+                if a[j] == "0":
+                    if [num, j] in bits:
+                        aux.append(1)
+                    else:
+                        aux.append(-1)
+                elif a[j] == "1":
+                    if [num, j] in bits:
+                        aux.append(-1)
+                    else:
+                        aux.append(1)
+        to_ret.append(aux)
+    return np.array(to_ret)
+# [a, b, c]
+# [0x04, 0x02, 0x04...] -> len=7 0x04 -> 00011
+
 def getSample(z_mean, z_log_var):
     z_mean, z_log_var = z_mean, z_log_var
     batch = tf.shape(z_mean)[0]
