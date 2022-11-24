@@ -1,76 +1,78 @@
-import numpy as np
+from keras.layers import Input, Dense, Lambda
+from keras import backend as K
+from keras import metrics
+from keras.models import Model
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-from utils import *
+from tensorflow.python.framework.ops import disable_eager_execution
 
-class VariationalAutoencoder(keras.Model):
 
-    def __init__(self, **kwargs):
-        super(VariationalAutoencoder, self).__init__(**kwargs)
-        latent = 2
-        self.initiateEncoder(latent)
-        self.initiateDecoder(latent)
+disable_eager_execution()
+class VariationalAutoencoder():
+    def __init__(self, x, y, hidden_layers, latent_layer):
+        self.latent_neurons = latent_layer
+        self.hidden_layers = hidden_layers
+        self.dim = len(x[0])
 
-        self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
-        self.reconstruction_loss_tracker = keras.metrics.Mean(name="reconstruction_loss")
-        self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+        x = Input(shape=(self.dim), name="input")
+        self.encoder = self.set_encoder(x)
+        self.encoder.summary()
+        self.decoder = self.set_decoder()
+        self.decoder.summary()
 
-    def train(self, trainset):
-        self.compile(optimizer=keras.optimizers.Adam())
-        self.fit(trainset, epochs=1, batch_size=100)
+        output_combined = self.decoder(self.encoder(x)[2])
 
-    def initiateDecoder(self, latent):
-        latInputs = keras.Input(shape=(latent,))
-        x = layers.Dense(7 * 7 * 64, activation="relu")(latInputs)
-        x = layers.Reshape((7, 7, 64))(x)
-        x = layers.Conv2DTranspose(20, 3, activation="relu", strides=2, padding="same")(x)
-        x = layers.Conv2DTranspose(10, 3, activation="relu", strides=2, padding="same")(x)
-        outputs = layers.Conv2DTranspose(1, 3, activation="sigmoid", padding="same")(x)
+        self.model = Model(x, output_combined)
 
-        self.decoder = keras.Model(latInputs, outputs, name="decoder")
+        self.model.summary()
+        self.model.compile(loss=self.vae_loss)
 
-    def initiateEncoder(self, latent):
-        encoder_inputs = keras.Input(shape=(28, 28, 1))  # Esperamos que el input sean de 28x28x1
-        x = layers.Conv2D(10, 3, activation="relu", strides=2, padding="same")(encoder_inputs)
-        x = layers.Conv2D(20, 3, activation="relu", strides=2, padding="same")(x)
-        x = layers.Flatten()(x)
-        x = layers.Dense(16, activation="relu")(x)
-        z_mean = layers.Dense(latent, name="z_mean")(x)
-        z_log_var = layers.Dense(latent, name="z_log_var")(x)
-        z = getSample(z_mean, z_log_var)
 
-        self.encoder = keras.Model(encoder_inputs, [z_mean, z_log_var, z], name="encoder")
+    def set_encoder(self,x):
+        h = None
+        if(len(self.hidden_layers) != 0):
+            aux_h = x
+            for (i,neurons) in enumerate(self.hidden_layers[:-1]):
+                h = Dense(neurons, name="encoding_{0}".format(i))(aux_h)
+                aux_h = h
+            h = Dense(self.hidden_layers[-1], activation="relu",
+                      name="encoding_{0}".format(len(self.hidden_layers) - 1))(aux_h)
+        self.z_mean = Dense(self.latent_neurons, name="mean")(h)
+        self.z_log_var = Dense(self.latent_neurons, name="log-variance")(h)
 
-    def train_step(self, data):
-        with tf.GradientTape() as tape:
-            z_mean, z_log_var, z = self.encoder(data)
-            reconstruction = self.decoder(z)
-            reconstruction_loss = tf.reduce_mean(
-                tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstruction), axis=(1, 2)
-                )
-            )
-            kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
-            kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-            total_loss = reconstruction_loss + kl_loss
-        grads = tape.gradient(total_loss, self.trainable_weights)
+        z = Lambda(self.sampling, output_shape=(self.latent_neurons))([self.z_mean, self.z_log_var])
+        encoder = Model(x, [self.z_mean, self.z_log_var, z], name="encoder")
+        return encoder
 
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        self.total_loss_tracker.update_state(total_loss)
-        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
-        self.kl_loss_tracker.update_state(kl_loss)
+    def set_decoder(self):
+        input_decoder = Input(shape=(self.latent_neurons,), name="decoder_input")
+        reversed_layers = self.hidden_layers.copy()
+        reversed_layers.reverse()
+        h = None
+        if (len(self.hidden_layers) != 0):
+            aux_h = input_decoder
+            for (i,neurons) in enumerate(reversed_layers[:-1]):
+                h = Dense(neurons, name="encoding_{0}".format(i))(aux_h)
+                aux_h = h
+            h = Dense(reversed_layers[-1], activation="relu", name="encoding_{0}".format(len(self.hidden_layers) - 1))(aux_h)
 
-        return {
-            "loss": self.total_loss_tracker.result(),
-            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
-            "kl_loss": self.kl_loss_tracker.result(),
-        }
+        x_decoded = Dense(self.dim, activation='sigmoid', name="flat_decoded")(h)
 
-    @property
-    def metrics(self):
-        return [
-            self.total_loss_tracker,
-            self.reconstruction_loss_tracker,
-            self.kl_loss_tracker,
-        ]
+        decoder = Model(input_decoder, x_decoded, name="decoder")
+        return decoder
+
+    def sampling(self, args: tuple):
+        z_mean, z_log_var = args
+        print(z_mean)
+        print(z_log_var)
+        epsilon = K.random_normal(shape=(K.shape(z_mean)[0], self.latent_neurons), mean=0.,
+                                  stddev=1.0)
+        return z_mean + K.exp(z_log_var / 2) * epsilon  # h(z)
+
+    def vae_loss(self, x: tf.Tensor, x_decoded_mean: tf.Tensor):
+        xent_loss = self.dim * metrics.binary_crossentropy(x, x_decoded_mean)
+        kl_loss = -0.5 * K.sum(1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var), axis=-1)
+        vae_loss = K.mean(xent_loss + kl_loss)
+        return vae_loss
+
+    def train(self, training_set, epochs, batch_size):
+        self.model.fit(training_set, training_set, epochs=epochs, batch_size=batch_size, validation_data=(training_set, training_set))
